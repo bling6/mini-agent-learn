@@ -1,3 +1,4 @@
+from agents.todo import todoList
 from openai import OpenAI
 import os
 import json
@@ -127,8 +128,8 @@ class Agent:
             self.messages.append(
                 {"role": "tool", "tool_call_id": tool_call_id, "content": result}
             )
-        
-        self.rounds_since_todo = 0 if used_todo else self.rounds_since_todo + 1
+        if todoList.items:
+            self.rounds_since_todo = 0 if used_todo else self.rounds_since_todo + 1
         # 超过三次未更新任务，需要提醒
         if self.rounds_since_todo >= 3:
-            self.messages.append({"role": "user", "content": "更新任务列表"})
+            self.messages.append({"role": "user", "content": "记得更新任务列表"})

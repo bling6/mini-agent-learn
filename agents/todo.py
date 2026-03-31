@@ -33,6 +33,9 @@ class TodoManager:
             lines.append(line)
         done_count = sum(1 for item in self.items if item["status"] == "completed")
         lines.append(f"已完成 {done_count}/{len(self.items)} 个任务")
+        # 所有任务都已完成，清空列表
+        if done_count == len(self.items):
+            self.items = []
         return "\n".join(lines)
 
 todoList = TodoManager()
