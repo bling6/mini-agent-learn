@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess
 import os
 from .todo import todoList
-from .skill_loader import SKILL_LOADER
+from .utils.skill_loader import SKILL_LOADER
 
 
 # TOOLS = [
@@ -150,9 +150,17 @@ BASE_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "compression",
+            "description": "手动触发上下文消息压缩"
+        },
+    },
 ]
 CHILD_TOOLS = BASE_TOOLS
-PARENT_TOOLS = CHILD_TOOLS + [{
+PARENT_TOOLS = CHILD_TOOLS + [
+    {
         "type": "function",
         "function": {
             "name": "task",
@@ -168,7 +176,8 @@ PARENT_TOOLS = CHILD_TOOLS + [{
                 "required": ["prompt"],
             },
         },
-    },]
+    },
+]
 
 WORKDIR = Path.cwd()
 

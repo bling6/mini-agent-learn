@@ -1,7 +1,7 @@
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from pathlib import Path
-from agents.skill_loader import SKILL_LOADER
+from agents.utils.skill_loader import SKILL_LOADER
 import threading
 
 

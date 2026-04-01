@@ -4,12 +4,16 @@ import os
 import json
 from dotenv import load_dotenv
 from agents.tools import PARENT_TOOLS, TOOL_MAPPER
+from agents.utils.context_compression import tools_msg_compression, auto_compression
 
 load_dotenv()
 
+# 压缩阈值，超过此长度压缩为摘要
+THRESHOLD = 5000
+
 client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com",
+    api_key=os.getenv("OPENAI_API_KEY"),
+    base_url=os.getenv("BASE_URL"),
 )
 
 
@@ -29,8 +33,13 @@ class Agent:
         self.rounds_since_todo = 0
         while True:
             print(f"\033[92m思考中...{'(子agent)' if self.isSubAgent else ''}\033[0m")
+            # 压缩工具调用结果消息
+            tools_msg_compression(self.messages)
+            # 自动压缩消息
+            if len(self.messages) > THRESHOLD:
+                self.messages[:] = auto_compression(self.messages)
             response = client.chat.completions.create(
-                model="deepseek-chat",
+                model="glm-5",
                 tools=self.tools,
                 messages=self.messages,
                 max_tokens=8000,
@@ -42,14 +51,18 @@ class Agent:
             tool_call_printed = set()
 
             for chunk in response:
-                delta = chunk.choices[0].delta
+                # print(chunk)
+                if chunk.choices:
+                    delta = chunk.choices[0].delta
 
-                if delta.content:
-                    print(delta.content, end="", flush=True)
-                    content_chunks.append(delta.content)
+                    if delta.content:
+                        print(delta.content, end="", flush=True)
+                        content_chunks.append(delta.content)
 
-                if delta.tool_calls:
-                    self.deal_tool_chunk(delta, tool_calls_chunks, tool_call_printed)
+                    if delta.tool_calls:
+                        self.deal_tool_chunk(
+                            delta, tool_calls_chunks, tool_call_printed
+                        )
             print()
 
             full_content = "".join(content_chunks) if content_chunks else "(无回复)"
@@ -119,16 +132,20 @@ class Agent:
 
     def tool_execute(self, tool_calls: list):
         used_todo = False
+        manual_compact = False
         for tool_call in tool_calls:
             tool_name = tool_call["function"]["name"]
             if tool_name == "todo":
                 used_todo = True
             args = json.loads(tool_call["function"]["arguments"])
             tool_call_id = tool_call["id"]
+            # subagent 调用
             if tool_name == "task":
                 from agents.sub_agent import run_subagent
-
                 result = run_subagent(args["prompt"])
+            elif tool_name == "compression":
+                manual_compact = True
+                result = "压缩中..."
             elif tool_name not in TOOL_MAPPER:
                 result = f"工具 {tool_name} 不存在"
             else:
@@ -144,3 +161,6 @@ class Agent:
         # 超过三次未更新任务，需要提醒
         if self.rounds_since_todo >= 3:
             self.messages.append({"role": "user", "content": "记得更新任务列表"})
+        if manual_compact:
+            print("手动压缩")
+            self.messages[:] = auto_compression(self.messages)

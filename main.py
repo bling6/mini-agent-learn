@@ -1,7 +1,7 @@
 # from agents.loop import agent_loop
 from agents.agent import Agent
-from agents.skill_loader import SKILL_LOADER
-from agents.watch_skill import run_watch_skill, stop_watch_skill
+from agents.utils.skill_loader import SKILL_LOADER
+from agents.utils.watch_skill import run_watch_skill, stop_watch_skill
 
 import os
 import sys
@@ -69,7 +69,7 @@ def _show_conversation_history(messages: list):
 
     print("\033[94m" + "=" * 60 + "\033[0m")
     print()
-    # print(messages)
+    print(messages)
 
 
 def main():
@@ -108,6 +108,7 @@ def main():
 
         except Exception as e:
             print(f"\033[91m[严重错误] 程序异常退出: {e}\033[0m")
+            stop_watch_skill()
             sys.exit(1)
         # print(f"历史记录: {messages}")
 
