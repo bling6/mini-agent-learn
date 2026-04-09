@@ -1,3 +1,4 @@
+from email import message
 from agents.todo import todoList
 from openai import OpenAI
 import os
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 from agents.tools import PARENT_TOOLS, TOOL_MAPPER
 from agents.utils.context_compression import tools_msg_compression, auto_compression
 from agents.utils.Permission import PermissionManager
+from agents.prompt import build_system_prompt
 
 
 load_dotenv()
@@ -39,6 +41,8 @@ class Agent:
     def agent_loop(self):
         self.rounds_since_todo = 0
         while True:
+            system_prompt = build_system_prompt()
+            self.messages[0]["content"] = system_prompt
             print(f"\033[92m思考中...{'(子agent)' if self.isSubAgent else ''}\033[0m")
             # 压缩工具调用结果消息
             tools_msg_compression(self.messages)
@@ -184,8 +188,11 @@ class Agent:
             self.messages.append({"role": "user", "content": "记得更新任务列表"})
 
     def check_permission(self, tool_name: str, args: dict):
+        if not self.permission:
+            return {
+                "result": "allow",
+            }
         decision = self.permission.check(tool_name, args)
-        print(args, decision)
         if decision["behavior"] == "deny":
             return {
                 "result": "deny",

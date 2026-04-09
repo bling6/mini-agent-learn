@@ -1,30 +1,12 @@
 # from agents.loop import agent_loop
 from agents.agent import Agent
-from agents.utils.skill_loader import SKILL_LOADER
 from agents.utils.watch_skill import run_watch_skill, stop_watch_skill
 from agents.utils.Permission import PermissionManager
+from agents.utils.Memory import memory_manager
+
 
 import os
 import sys
-
-
-# 系统提示词
-SYSTEM = f"""你是 {os.getcwd()} 的专业的 AI 程序员助手。
-注意事项：
-- 你必须**先判断用户问题是否需要技能**：
-   - 不需要技能 → 直接正常回答
-   - 需要技能 → 必须按固定格式声明“加载技能”，再执行
-- 加载技能使用load_skill工具
-- 只能操作当前工作目录下的所有文件和目录，包括子级
-- 执行危险命令会被拒绝
-- 文件操作支持 UTF-8 编码
-- 使用uv包管理工具，如果uv命令不存在，请先安装uv包，需要使用者确认安装
-- 回复内容不用过于详细
-
-你拥有以下可用技能：
-{SKILL_LOADER.get_descriptions()}
-
-"""
 
 
 def _print_welcome():
@@ -34,6 +16,7 @@ def _print_welcome():
     print("\033[90m输入 'exit', 'quit', 'q' 或按 Ctrl+D 退出\033[0m")
     print("\033[90m输入 'clear' 清空对话历史\033[0m")
     print("\033[90m输入 'history' 查看对话历史\033[0m")
+    print("\033[90m输入 'memories' 查看记忆历史\033[0m")
     print("\033[94m" + "=" * 60 + "\033[0m")
     print()
 
@@ -72,10 +55,12 @@ def _show_conversation_history(messages: list):
 
 
 def main():
-    _print_welcome()
-    run_watch_skill()
+    memory_manager.load_all()
+    mem_count = len(memory_manager.memories)
+    if mem_count:
+        print(f"[{mem_count} 条记忆已加载]")
     messages = [
-        {"role": "system", "content": SYSTEM},
+        {"role": "system", "content": ""},
     ]
     perms = PermissionManager()
     while True:
@@ -92,6 +77,13 @@ def main():
 
             if user_input.lower() == "history":
                 _show_conversation_history(messages)
+                continue
+            if user_input.strip() == "memories":
+                if memory_manager.memories:
+                    for name, mem in memory_manager.memories.items():
+                        print(f"  [{mem['type']}] {name}: {mem['description']}")
+                else:
+                    print("  (no memories)")
                 continue
 
             messages.append(
@@ -114,4 +106,6 @@ def main():
 
 
 if __name__ == "__main__":
+    _print_welcome()
+    run_watch_skill()
     main()

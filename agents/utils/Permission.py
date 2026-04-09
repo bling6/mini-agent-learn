@@ -9,6 +9,7 @@ DEFAULT_RULES = [
     {"tool": "bash", "content": "sudo *", "behavior": "deny"},
     # Allow reading anything
     {"tool": "read_file", "path": "*", "behavior": "allow"},
+    {"tool": "save_memory", "behavior": "allow"},
 ]
 
 

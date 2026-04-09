@@ -3,6 +3,7 @@ import subprocess
 import os
 from .todo import todoList
 from .utils.skill_loader import SKILL_LOADER
+from .utils.Memory import memory_manager
 
 
 # TOOLS = [
@@ -152,10 +153,7 @@ BASE_TOOLS = [
     },
     {
         "type": "function",
-        "function": {
-            "name": "compression",
-            "description": "手动触发上下文消息压缩"
-        },
+        "function": {"name": "compression", "description": "手动触发上下文消息压缩"},
     },
 ]
 CHILD_TOOLS = BASE_TOOLS
@@ -174,6 +172,36 @@ PARENT_TOOLS = CHILD_TOOLS + [
                     }
                 },
                 "required": ["prompt"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_memory",
+            "description": "保存跨会话保留的持久记忆",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "简短标识符（例如 prefer_tabs、db_schema）",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "用一句话概括这段记忆的内容",
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "user=偏好设置, feedback=用户明确纠正过你的地方。, project=不容易从代码直接重新看出来的项目约定或背景, reference=外部资源指针",
+                        "enum": ["user", "feedback", "project", "reference"],
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "完整的记忆内容，可多行显示",
+                    },
+                },
+                "required": ["name", "description", "type", "content"],
             },
         },
     },
@@ -250,12 +278,19 @@ def run_edit_file(path: str, old_text: str, new_text: str):
     except Exception as e:
         return f"文件 {file_path} 编辑失败: {e}"
 
+# 保存记忆工具
+def run_save_memory(name: str, description: str, type: str, content: str) -> str:
+    return memory_manager.save_memory(name, description, type, content)
+
 
 TOOL_MAPPER = {
     "bash": run_bash,
     "read_file": run_read_file,
-    "write_file": run_write_file,
-    "edit_file": run_edit_file,
+    "write_file": lambda **kw: run_write_file(kw["path"], kw["content"]),
+    "edit_file": lambda **kw: run_edit_file(kw["path"], kw["old_text"], kw["new_text"]),
     "todo": todoList.update,
     "load_skill": SKILL_LOADER.get_content,
+    "save_memory": lambda **kw: run_save_memory(
+        kw["name"], kw["description"], kw["type"], kw["content"]
+    ),
 }
