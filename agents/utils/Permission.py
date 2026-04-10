@@ -10,6 +10,11 @@ DEFAULT_RULES = [
     # Allow reading anything
     {"tool": "read_file", "path": "*", "behavior": "allow"},
     {"tool": "save_memory", "behavior": "allow"},
+    {"tool": "task_list", "behavior": "allow"},
+    {"tool": "task_create", "behavior": "allow"},
+    {"tool": "task_get", "behavior": "allow"},
+    {"tool": "task_update", "behavior": "allow"},
+    {"tool": "task_del", "behavior": "allow"},
 ]
 
 

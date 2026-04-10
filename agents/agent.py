@@ -163,7 +163,7 @@ class Agent:
             if tool_name == "todo":
                 used_todo = True
             # subagent 调用
-            if tool_name == "task":
+            if tool_name == "spawn_agent":
                 from agents.sub_agent import run_subagent
 
                 result = run_subagent(args["prompt"])

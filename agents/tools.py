@@ -4,6 +4,7 @@ import os
 from .todo import todoList
 from .utils.skill_loader import SKILL_LOADER
 from .utils.Memory import memory_manager
+from .task import task_manager
 
 
 # TOOLS = [
@@ -102,7 +103,7 @@ BASE_TOOLS = [
         "type": "function",
         "function": {
             "name": "todo",
-            "description": "更新任务列表。跟踪多步骤任务的进度。",
+            "description": "创建和更新简单的待办任务事项列表。跟踪多步骤任务的进度。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -161,7 +162,7 @@ PARENT_TOOLS = CHILD_TOOLS + [
     {
         "type": "function",
         "function": {
-            "name": "task",
+            "name": "spawn_agent",
             "description": "生成一个具有全新上下文的子代理,用于执行指定任务",
             "parameters": {
                 "type": "object",
@@ -179,7 +180,7 @@ PARENT_TOOLS = CHILD_TOOLS + [
         "type": "function",
         "function": {
             "name": "save_memory",
-            "description": "保存跨会话保留的持久记忆",
+            "description": "保存跨会话保留的持久记忆。如果保存的内容与之前有相似，考虑合并。如果内容意思相反，考虑覆盖。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -202,6 +203,115 @@ PARENT_TOOLS = CHILD_TOOLS + [
                     },
                 },
                 "required": ["name", "description", "type", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "task_create",
+            "description": "创建一个持久化任务(utf-8编码)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string",
+                        "description": "任务内容",
+                    },
+                    "description": {"type": "string", "description": "任务补充说明"},
+                },
+                "required": ["subject"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "task_update",
+            "description": "更新一个任务的状态",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "任务ID",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "in_progress", "completed", "deleted"],
+                        "description": "任务状态",
+                    },
+                    "owner": {
+                        "type": "string",
+                        "description": "当队友认领任务时设置",
+                    },
+                    "addBlockedBy": {
+                        "type": "array",
+                        "items": {
+                            "description": "前置任务ID",
+                            "type": "integer",
+                        },
+                        "description": "要添加的前置任务ID列表,只有前置任务完成才能执行当前任务",
+                    },
+                    "addBlocks": {
+                        "type": "array",
+                        "items": {
+                            "description": "后续任务ID",
+                            "type": "integer",
+                        },
+                        "description": "要添加的后续任务ID列表,只有当前任务完成才能执行后续任务",
+                    },
+                },
+                "required": ["task_id", "status"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "task_list",
+            "description": "列出所有任务及其状态摘要",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "task_get",
+            "description": "获取一个任务详情",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "任务ID",
+                    },
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "task_del",
+            "description": "删除多个任务文件",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "description": "任务ID",
+                        },
+                        "description": "任务ID列表",
+                    },
+                },
+                "required": ["task_ids"],
             },
         },
     },
@@ -278,6 +388,7 @@ def run_edit_file(path: str, old_text: str, new_text: str):
     except Exception as e:
         return f"文件 {file_path} 编辑失败: {e}"
 
+
 # 保存记忆工具
 def run_save_memory(name: str, description: str, type: str, content: str) -> str:
     return memory_manager.save_memory(name, description, type, content)
@@ -293,4 +404,17 @@ TOOL_MAPPER = {
     "save_memory": lambda **kw: run_save_memory(
         kw["name"], kw["description"], kw["type"], kw["content"]
     ),
+    "task_create": lambda **kw: task_manager.create(
+        kw["subject"], kw.get("description", "")
+    ),
+    "task_update": lambda **kw: task_manager.update(
+        kw["task_id"],
+        kw.get("status"),
+        kw.get("owner"),
+        kw.get("addBlockedBy"),
+        kw.get("addBlocks"),
+    ),
+    "task_list": task_manager.list_all,
+    "task_get": lambda **kw: task_manager.get(kw["task_id"]),
+    "task_del": lambda **kw: task_manager.del_file(kw["task_ids"]),
 }
