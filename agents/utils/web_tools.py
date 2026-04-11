@@ -79,7 +79,28 @@ def web_fetch(url: str, max_length: int = 8000) -> str:
         h.ignore_emphasis = True
         h.skip_internal_links = True
         result = h.handle(raw)
+        # 清理多余空白
+        result = _clean_text(result)
         return result[:max_length]
 
     # 其他格式直接截断返回
     return raw[:max_length]
+
+
+def _clean_text(text: str) -> str:
+    """清理文本中的多余空白和换行"""
+    lines = text.splitlines()
+    # print(lines)
+    cleaned = []
+    for line in lines:
+        stripped = line.rstrip()
+        if not stripped:
+            cleaned.append("")
+        else:
+            cleaned.append(stripped)
+    result = " ".join(cleaned).strip()
+    # 合并多余空格
+    import re
+
+    result = re.sub(r"[ \t]+", " ", result)
+    return result

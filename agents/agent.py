@@ -115,6 +115,9 @@ class Agent:
                     max_tokens=8000,
                 )
                 msg = response.choices[0].message
+                if msg.reasoning_content:
+                    print("\033[94m思考内容: \033[0m")
+                    print(f"\033[90m {msg.reasoning_content}\033[0m")
                 tool_calls = None
                 if msg.tool_calls:
                     tool_calls = [
