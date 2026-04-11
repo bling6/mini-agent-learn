@@ -17,7 +17,7 @@ client = OpenAI(
 WORKDIR = Path.cwd()
 
 # 保留最近的工具调用结果数量
-KEEP_RECENT = 10
+KEEP_RECENT = 20
 # 不压缩结果的工具名称集合
 RESERVE_RESULT_TOOLS = {"read_file"}
 # 最小内容长度，低于此长度不压缩
@@ -41,7 +41,7 @@ def tools_msg_compression(messages: list[dict[str, Any]]) -> list[dict[str, Any]
     for msg in messages:
         if msg.get("role") == "assistant" and msg.get("tool_calls"):
             for tool_call in msg["tool_calls"]:
-                tool_name_map[tool_call["id"]] = tool_call["function"]["name"]
+                tool_name_map[tool_call.id] = tool_call.function.name
     
     # 遍历除最近结果外的所有工具结果进行压缩
     for result in tool_results[:-KEEP_RECENT]:

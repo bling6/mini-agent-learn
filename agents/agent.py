@@ -96,56 +96,20 @@ class Agent:
                 tools=self.tools,
                 messages=self.messages,
                 max_tokens=8000,
-                stream=True,
             )
-
-            content_chunks = []
-            tool_calls_chunks = {}
-            tool_call_printed = set()
-
-            for chunk in response:
-                # print(chunk)
-                if chunk.choices:
-                    delta = chunk.choices[0].delta
-                    if delta.content:
-                        print(delta.content, end="", flush=True)
-                        content_chunks.append(delta.content)
-                    if delta.tool_calls:
-                        self.deal_tool_chunk(
-                            delta, tool_calls_chunks, tool_call_printed
-                        )
-            print()
-
-            full_content = "".join(content_chunks) if content_chunks else ""
-
-            tool_calls = None
-            if tool_calls_chunks:
-                tool_calls = []
-                for index in sorted(tool_calls_chunks.keys()):
-                    chunk = tool_calls_chunks[index]
-                    tool_calls.append(
-                        {
-                            "id": chunk["id"],
-                            "type": chunk["type"],
-                            "function": {
-                                "name": chunk["function"]["name"],
-                                "arguments": chunk["function"]["arguments"],
-                            },
-                        }
-                    )
-
-                self.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": full_content,
-                        "tool_calls": tool_calls,
-                    }
-                )
-
-            if not tool_calls:
+            msg = response.choices[0].message
+            self.messages.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": msg.tool_calls,
+                }
+            )
+            full_content = msg.content
+            if not msg.tool_calls:
+                print(full_content)
                 return full_content
-
-            self.tool_execute(tool_calls)
+            self.tool_execute(msg.tool_calls)
 
             print()
 
@@ -184,9 +148,11 @@ class Agent:
     def tool_execute(self, tool_calls: list):
         used_todo = False
         for tool_call in tool_calls:
-            tool_name = tool_call["function"]["name"]
-            tool_call_id = tool_call["id"]
-            args = json.loads(tool_call["function"]["arguments"])
+            tool_name = tool_call.function.name
+            tool_call_id = tool_call.id
+            args = json.loads(tool_call.function.arguments)
+            print(f"\n\033[33m{self.teammateName}🛠️ [调用工具] {tool_name}\033[0m")
+            print(f"\033[90m   参数:  \033[0m{args}")
             # 检查权限
             permission = self.check_permission(tool_name, args)
             if permission["result"] == "deny":
@@ -273,3 +239,50 @@ class Agent:
             )
             return notify_text
         return None
+
+    def stream_response(self, response: str):
+        content_chunks = []
+        tool_calls_chunks = {}
+        tool_call_printed = set()
+
+        for chunk in response:
+            # print(chunk)
+            if chunk.choices:
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    print(delta.content, end="", flush=True)
+                    content_chunks.append(delta.content)
+                if delta.tool_calls:
+                    self.deal_tool_chunk(delta, tool_calls_chunks, tool_call_printed)
+        print()
+
+        full_content = "".join(content_chunks) if content_chunks else ""
+
+        tool_calls = None
+        if tool_calls_chunks:
+            tool_calls = []
+            for index in sorted(tool_calls_chunks.keys()):
+                chunk = tool_calls_chunks[index]
+                tool_calls.append(
+                    {
+                        "id": chunk["id"],
+                        "type": chunk["type"],
+                        "function": {
+                            "name": chunk["function"]["name"],
+                            "arguments": chunk["function"]["arguments"],
+                        },
+                    }
+                )
+
+            self.messages.append(
+                {
+                    "role": "assistant",
+                    "content": full_content,
+                    "tool_calls": tool_calls,
+                }
+            )
+
+        return {
+            "content": full_content,
+            "tool_calls": tool_calls,
+        }

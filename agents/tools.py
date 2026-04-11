@@ -167,7 +167,7 @@ BUS_TOOLS = [
         "type": "function",
         "function": {
             "name": "send_message",
-            "description": "发送消息给队友.",
+            "description": "发送任务消息给队友",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -199,248 +199,247 @@ BUS_TOOLS = [
     },
 ]
 CHILD_TOOLS = BASE_TOOLS
-PARENT_TOOLS = CHILD_TOOLS + BUS_TOOLS + [
-    {
-        "type": "function",
-        "function": {
-            "name": "spawn_agent",
-            "description": "生成一个具有全新上下文的子代理,用于执行指定任务",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "prompt": {
-                        "type": "string",
-                        "description": "要运行的任务描述",
-                    }
+PARENT_TOOLS = (
+    CHILD_TOOLS
+    + BUS_TOOLS
+    + [
+        {
+            "type": "function",
+            "function": {
+                "name": "spawn_agent",
+                "description": "生成一个具有全新上下文的子代理,用于执行指定任务",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "要运行的任务描述",
+                        }
+                    },
+                    "required": ["prompt"],
                 },
-                "required": ["prompt"],
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_memory",
-            "description": "保存跨会话保留的持久记忆。如果保存的内容与之前有相似，考虑合并。如果内容意思相反，考虑覆盖。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "简短标识符（例如 prefer_tabs、db_schema）",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "用一句话概括这段记忆的内容",
-                    },
-                    "type": {
-                        "type": "string",
-                        "description": "user=偏好设置, feedback=用户明确纠正过你的地方。, project=不容易从代码直接重新看出来的项目约定或背景, reference=外部资源指针",
-                        "enum": ["user", "feedback", "project", "reference"],
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "完整的记忆内容，可多行显示",
-                    },
-                },
-                "required": ["name", "description", "type", "content"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "task_create",
-            "description": "创建一个持久化任务(utf-8编码)",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "subject": {
-                        "type": "string",
-                        "description": "任务内容",
-                    },
-                    "description": {"type": "string", "description": "任务补充说明"},
-                },
-                "required": ["subject"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "task_update",
-            "description": "更新一个任务的状态",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "integer",
-                        "description": "任务ID",
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": ["pending", "in_progress", "completed", "deleted"],
-                        "description": "任务状态",
-                    },
-                    "owner": {
-                        "type": "string",
-                        "description": "当队友认领任务时设置",
-                    },
-                    "addBlockedBy": {
-                        "type": "array",
-                        "items": {
-                            "description": "前置任务ID",
-                            "type": "integer",
+        {
+            "type": "function",
+            "function": {
+                "name": "save_memory",
+                "description": "保存跨会话保留的持久记忆。如果保存的内容与之前有相似，考虑合并。如果内容意思相反，考虑覆盖。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "简短标识符（例如 prefer_tabs、db_schema）",
                         },
-                        "description": "要添加的前置任务ID列表,只有前置任务完成才能执行当前任务",
-                    },
-                    "addBlocks": {
-                        "type": "array",
-                        "items": {
-                            "description": "后续任务ID",
-                            "type": "integer",
+                        "description": {
+                            "type": "string",
+                            "description": "用一句话概括这段记忆的内容",
                         },
-                        "description": "要添加的后续任务ID列表,只有当前任务完成才能执行后续任务",
+                        "type": {
+                            "type": "string",
+                            "description": "user=偏好设置, feedback=用户明确纠正过你的地方。, project=不容易从代码直接重新看出来的项目约定或背景, reference=外部资源指针",
+                            "enum": ["user", "feedback", "project", "reference"],
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "完整的记忆内容，可多行显示",
+                        },
                     },
+                    "required": ["name", "description", "type", "content"],
                 },
-                "required": ["task_id", "status"],
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "task_list",
-            "description": "列出所有任务及其状态摘要",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "task_get",
-            "description": "获取一个任务详情",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "integer",
-                        "description": "任务ID",
+        {
+            "type": "function",
+            "function": {
+                "name": "task_create",
+                "description": "创建一个持久化任务(utf-8编码)",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "description": "任务内容",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "任务补充说明",
+                        },
                     },
+                    "required": ["subject"],
                 },
-                "required": ["task_id"],
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "task_del",
-            "description": "删除多个任务文件",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_ids": {
-                        "type": "array",
-                        "items": {
+        {
+            "type": "function",
+            "function": {
+                "name": "task_update",
+                "description": "更新一个任务的状态",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task_id": {
                             "type": "integer",
                             "description": "任务ID",
                         },
-                        "description": "任务ID列表",
+                        "status": {
+                            "type": "string",
+                            "enum": ["pending", "in_progress", "completed", "deleted"],
+                            "description": "任务状态",
+                        },
+                        "owner": {
+                            "type": "string",
+                            "description": "当队友认领任务时设置",
+                        },
+                        "addBlockedBy": {
+                            "type": "array",
+                            "items": {
+                                "description": "前置任务ID",
+                                "type": "integer",
+                            },
+                            "description": "要添加的前置任务ID列表,只有前置任务完成才能执行当前任务",
+                        },
+                        "addBlocks": {
+                            "type": "array",
+                            "items": {
+                                "description": "后续任务ID",
+                                "type": "integer",
+                            },
+                            "description": "要添加的后续任务ID列表,只有当前任务完成才能执行后续任务",
+                        },
                     },
-                },
-                "required": ["task_ids"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "background_run",
-            "description": "在后台线程中运行command。立即返回 task_id。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "要运行的命令",
-                    },
-                },
-                "required": ["command"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "check_background",
-            "description": "检查后台线程任务的状态。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "string",
-                        "description": "任务ID",
-                    },
+                    "required": ["task_id", "status"],
                 },
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "spawn_teammate",
-            "description": "生成或者唤醒一个在独立线程中运行的持久队友",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "队友名称",
+        {
+            "type": "function",
+            "function": {
+                "name": "task_list",
+                "description": "列出所有任务及其状态摘要",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "task_get",
+                "description": "获取一个任务详情",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task_id": {
+                            "type": "integer",
+                            "description": "任务ID",
+                        },
                     },
-                    "role": {
-                        "type": "string",
-                        "description": "队友角色",
+                    "required": ["task_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "task_del",
+                "description": "删除多个任务文件",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer",
+                                "description": "任务ID",
+                            },
+                            "description": "任务ID列表",
+                        },
                     },
-                    "prompt": {
-                        "type": "string",
+                    "required": ["task_ids"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "background_run",
+                "description": "在后台线程中运行command。立即返回 task_id。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "要运行的命令",
+                        },
+                    },
+                    "required": ["command"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "check_background",
+                "description": "检查后台线程任务的状态。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task_id": {
+                            "type": "string",
+                            "description": "任务ID",
+                        },
                     },
                 },
-                "required": ["name", "role", "prompt"],
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_teammates",
-            "description": "列出所有队友的名称、角色和状态",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "broadcast",
-            "description": "广播消息给所有队友",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
+        {
+            "type": "function",
+            "function": {
+                "name": "spawn_teammate",
+                "description": "生成或者唤醒一个在独立线程中运行的持久队友，然后要用send_message工具发送任务消息",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "role": {"type": "string"},
+                        "prompt": {"type": "string"},
                     },
+                    "required": ["name", "role", "prompt"],
                 },
-                "required": ["content"],
             },
         },
-    },
-]
+        {
+            "type": "function",
+            "function": {
+                "name": "list_teammates",
+                "description": "列出所有队友的名称、角色和状态",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "broadcast",
+                "description": "广播消息给所有队友",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                        },
+                    },
+                    "required": ["content"],
+                },
+            },
+        },
+    ]
+)
 WORKDIR = Path.cwd()
 
 
