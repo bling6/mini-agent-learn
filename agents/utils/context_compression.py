@@ -41,7 +41,11 @@ def tools_msg_compression(messages: list[dict[str, Any]]) -> list[dict[str, Any]
     for msg in messages:
         if msg.get("role") == "assistant" and msg.get("tool_calls"):
             for tool_call in msg["tool_calls"]:
-                tool_name_map[tool_call.id] = tool_call.function.name
+                # 兼容字典格式和 SDK 对象格式
+                if isinstance(tool_call, dict):
+                    tool_name_map[tool_call["id"]] = tool_call["function"]["name"]
+                else:
+                    tool_name_map[tool_call.id] = tool_call.function.name
     
     # 遍历除最近结果外的所有工具结果进行压缩
     for result in tool_results[:-KEEP_RECENT]:

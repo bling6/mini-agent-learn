@@ -50,7 +50,7 @@ class PermissionManager:
                 if match_rule["behavior"] == "deny":
                     return {"behavior": "deny", "reason": f"deny rule: {match_rule}"}
                 if match_rule["behavior"] == "allow":
-                    self.consecutive_denials = 0
+                    # self.consecutive_denials = 0
                     return {"behavior": "allow", "reason": f"allow rule: {match_rule}"}
         return {
             "behavior": "ask",

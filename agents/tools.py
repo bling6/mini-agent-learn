@@ -345,7 +345,7 @@ PARENT_TOOLS = (
             "type": "function",
             "function": {
                 "name": "task_del",
-                "description": "删除多个任务文件",
+                "description": "完成任务后，用于删除多个任务文件",
                 "parameters": {
                     "type": "object",
                     "properties": {

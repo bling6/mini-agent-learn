@@ -9,6 +9,7 @@ from agents.utils.context_compression import tools_msg_compression, auto_compres
 from agents.utils.Permission import PermissionManager
 from agents.prompt import build_system_prompt
 from agents.background_task import bgManager
+from agents.utils.transcript import transcript_manager
 from .teams import messageBus
 
 
@@ -40,9 +41,24 @@ class Agent:
         self.isSubAgent = isSubAgent
         self.system_prompt = system_prompt
         self.teammateName = teammateName
+        self.agent_name = teammateName if teammateName else "lead"
 
     def run(self):
         return self.agent_loop()
+
+    def save_all_messages(self):
+        """保存消息到 transcript，只保存本轮新增的"""
+        if not self.messages:
+            return
+
+        file_path = transcript_manager._get_file_path(self.agent_name)
+        # 计算已有行数，只追加新增的消息
+        existing = 0
+        if file_path.exists():
+            existing = len(file_path.read_text(encoding="utf-8").strip().splitlines())
+
+        for msg in self.messages[existing:]:
+            transcript_manager.save_message(self.agent_name, msg)
 
     def deal_inbox(self):
         inbox = messageBus.read_inbox(self.teammateName or "lead")
@@ -71,47 +87,62 @@ class Agent:
 
     def agent_loop(self):
         self.rounds_since_todo = 0
-        while True:
-            system_prompt = build_system_prompt(prefix=self.system_prompt)
-            self.messages[0]["content"] = system_prompt
-            notify_text = self.check_background()
-            if notify_text:
-                self.messages.append(
-                    {
-                        "role": "user",
-                        "content": f"<background-results>\n{notify_text}\n</background-results>",
-                    }
+        try:
+            while True:
+                system_prompt = build_system_prompt(prefix=self.system_prompt)
+                self.messages[0]["content"] = system_prompt
+                notify_text = self.check_background()
+                if notify_text:
+                    self.messages.append(
+                        {
+                            "role": "user",
+                            "content": f"<background-results>\n{notify_text}\n</background-results>",
+                        }
+                    )
+                self.deal_inbox()
+                print(
+                    f"\033[92m思考中...{f'({self.teammateName})' if self.teammateName else ''}\033[0m"
                 )
-            self.deal_inbox()
-            print(
-                f"\033[92m思考中...{f'({self.teammateName})' if self.teammateName else ''}\033[0m"
-            )
-            # 压缩工具调用结果消息
-            tools_msg_compression(self.messages)
-            # 自动压缩消息
-            if len(self.messages) > THRESHOLD:
-                self.messages[:] = auto_compression(self.messages)
-            response = client.chat.completions.create(
-                model=os.getenv("MODEL"),
-                tools=self.tools,
-                messages=self.messages,
-                max_tokens=8000,
-            )
-            msg = response.choices[0].message
-            self.messages.append(
-                {
+                # 压缩工具调用结果消息
+                tools_msg_compression(self.messages)
+                # 自动压缩消息
+                if len(self.messages) > THRESHOLD:
+                    self.messages[:] = auto_compression(self.messages)
+                response = client.chat.completions.create(
+                    model=os.getenv("MODEL"),
+                    tools=self.tools,
+                    messages=self.messages,
+                    max_tokens=8000,
+                )
+                msg = response.choices[0].message
+                tool_calls = None
+                if msg.tool_calls:
+                    tool_calls = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+                assistant_msg = {
                     "role": "assistant",
                     "content": msg.content,
-                    "tool_calls": msg.tool_calls,
+                    "tool_calls": tool_calls,
                 }
-            )
-            full_content = msg.content
-            if not msg.tool_calls:
-                print(full_content)
-                return full_content
-            self.tool_execute(msg.tool_calls)
+                self.messages.append(assistant_msg)
+                full_content = msg.content
+                if not msg.tool_calls:
+                    print(full_content)
+                    return full_content
+                self.tool_execute(msg.tool_calls)
 
-            print()
+                print()
+        finally:
+            self.save_all_messages()
 
     def deal_tool_chunk(self, delta, tool_calls_chunks, tool_call_printed):
         for tool_call_delta in delta.tool_calls:
@@ -200,7 +231,11 @@ class Agent:
             print("\033[32m 执行结果:\033[0m")
             print(f"\033[32m{out}\033[0m")
             self.messages.append(
-                {"role": "tool", "tool_call_id": tool_call_id, "content": result[:8000]}
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": result[:8000],
+                }
             )
         if todoList.items:
             self.rounds_since_todo = 0 if used_todo else self.rounds_since_todo + 1

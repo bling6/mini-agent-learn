@@ -3,6 +3,7 @@ from agents.agent import Agent
 from agents.utils.watch_skill import run_watch_skill, stop_watch_skill
 from agents.utils.Permission import PermissionManager
 from agents.utils.Memory import memory_manager
+from agents.utils.transcript import transcript_manager
 
 
 import os
@@ -19,6 +20,7 @@ def _print_welcome():
     print("\033[90m输入 'clear' 清空对话历史\033[0m")
     print("\033[90m输入 'history' 查看对话历史\033[0m")
     print("\033[90m输入 'memories' 查看记忆历史\033[0m")
+    print("\033[90m输入 'restore' 恢复历史对话\033[0m")
     # print("\033[90m输入 '/init' 初始化助手\033[0m")
     print("\033[94m" + "=" * 60 + "\033[0m")
     print()
@@ -54,7 +56,50 @@ def _show_conversation_history(messages: list):
 
     print("\033[94m" + "=" * 60 + "\033[0m")
     print()
-    print(messages)
+
+
+def _restore_session(messages: list) -> list:
+    """恢复历史会话，返回恢复后的消息列表"""
+    sessions = transcript_manager.list_sessions()
+    if not sessions:
+        print("\033[93m没有可用的历史对话\033[0m")
+        return messages
+
+    print("\033[94m可用的历史会话:\033[0m")
+    for i, session in enumerate(sessions, 1):
+        agents_str = ", ".join(session["agents"])
+        print(
+            f"  [{i}] {session['session_id']} - {session['message_count']} 条消息 (agents: {agents_str})"
+        )
+
+    try:
+        choice = input("\033[90m选择要恢复的会话编号 (按回车取消): \033[0m")
+        if not choice.strip():
+            return messages
+
+        idx = int(choice) - 1
+        if idx < 0 or idx >= len(sessions):
+            print("\033[91m❌ 无效的编号\033[0m")
+            return messages
+
+        selected = sessions[idx]
+        # 优先加载 lead agent 的消息
+        lead_file = None
+        for f in selected["files"]:
+            if f.endswith("_lead") or f == "lead":
+                lead_file = f
+                break
+        file_stem = lead_file or selected["files"][0]
+        restored = transcript_manager.load_messages_by_file(file_stem)
+        # 开启新 session，避免恢复的历史叠加到旧文件
+        transcript_manager.new_session()
+        print(
+            f"\033[92m✅ 已恢复会话 '{selected['session_id']}' 的 {len(restored)} 条消息\033[0m"
+        )
+        return restored
+    except (ValueError, KeyboardInterrupt):
+        print("\033[90m已取消\033[0m")
+        return messages
 
 
 def main():
@@ -88,6 +133,9 @@ def main():
                 else:
                     print("  (no memories)")
                 continue
+            if user_input.lower() == "restore":
+                messages = _restore_session(messages)
+                continue
             # if user_input.strip() == "/init":
             #     messages.append(
             #         {"role": "user", "content": INIT_PROMPT},
@@ -96,6 +144,7 @@ def main():
             messages.append(
                 {"role": "user", "content": user_input},
             )
+            transcript_manager.save_message("lead", messages[-1])
             Agent(messages=messages, permission=perms).run()
             # if out:
             #     print(out)
