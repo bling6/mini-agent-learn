@@ -241,7 +241,7 @@ function App() {
           </button>
           <div className="header-title">AI 编程助手</div>
           <div className="header-actions">
-            <button className="btn" onClick={handleClear}>清空对话</button>
+            {/* <button className="btn" onClick={handleClear}>清空对话</button> */}
           </div>
         </div>
 
