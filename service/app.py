@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agents.agent import Agent
+from agents.output_handler import AgentEvent
 from agents.utils.Memory import memory_manager
 from agents.utils.watch_skill import run_watch_skill, stop_watch_skill
 from agents.utils.transcript import transcript_manager
@@ -103,9 +104,13 @@ def chat(req: ChatRequest):
                 messages=session.messages,
                 permission=session.permission,
                 output_handler=session.output_handler,
+                stop_event=run.stop_event,
             )
             agent.run()
-            run.status = "completed"
+            if run.stop_event.is_set():
+                run.status = "interrupted"
+            else:
+                run.status = "completed"
         except Exception as e:
             run.status = "error"
             run.error = str(e)
@@ -155,6 +160,18 @@ async def stream_events(run_id: str):
             handler.unsubscribe(notify)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/runs/{run_id}/interrupt")
+def interrupt_run(run_id: str):
+    run = session_manager.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.status != "running":
+        return {"status": run.status}
+    run.stop_event.set()
+    run.session.output_handler.emit(AgentEvent("interrupted", {}))
+    return {"status": "interrupting"}
 
 
 @app.get("/api/sessions/{session_id}/history", response_model=HistoryResponse)

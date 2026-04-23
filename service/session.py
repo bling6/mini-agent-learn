@@ -20,11 +20,12 @@ class Session:
 class RunState:
     def __init__(self, run_id: str, session: Session):
         self.run_id = run_id
-        self.status = "running"  # running | completed | error
+        self.status = "running"  # running | completed | error | interrupted
         self.event_index = len(session.output_handler.events)
         self.session = session
         self.result: str | None = None
         self.error: str | None = None
+        self.stop_event = threading.Event()
 
 
 class SessionManager:

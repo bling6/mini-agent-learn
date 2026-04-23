@@ -3,13 +3,14 @@ import ReactMarkdown from "react-markdown";
 import type { AgentEvent, ChatMessage } from "./types";
 import {
   createSession,
+  newSession,
   sendMessage,
   createEventSource,
   getHistory,
-  clearSession,
   listTranscripts,
   restoreTranscript,
   deleteTranscript,
+  interruptRun,
 } from "./api";
 import type { TranscriptSession } from "./api";
 import "./App.css";
@@ -20,8 +21,9 @@ function App() {
   const [input, setInput] = useState("");
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [transcripts, setTranscripts] = useState<TranscriptSession[]>([]);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +82,7 @@ function App() {
     setIsRunning(true);
 
     const rid = await sendMessage(sessionId, userMsg);
+    setCurrentRunId(rid);
 
     // Connect SSE
     const es = createEventSource(rid);
@@ -93,6 +96,7 @@ function App() {
       if (eventType === "done") {
         // Run completed
         setIsRunning(false);
+        setCurrentRunId(null);
         es.close();
         eventSourceRef.current = null;
         // Reload history to get final assistant message
@@ -116,6 +120,7 @@ function App() {
 
     es.onerror = () => {
       setIsRunning(false);
+      setCurrentRunId(null);
       es.close();
       eventSourceRef.current = null;
       if (sessionId) {
@@ -133,16 +138,19 @@ function App() {
     };
   };
 
-  const handleClear = async () => {
-    if (!sessionId) return;
+  const handleNewChat = async () => {
+    if (isRunning) return;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
-    await clearSession(sessionId);
+    const newId = await newSession();
+    setSessionId(newId);
     setMessages([]);
     setEvents([]);
     setIsRunning(false);
+    setCurrentRunId(null);
+    listTranscripts().then(setTranscripts);
   };
 
   const handleRestore = async (transcriptId: string) => {
@@ -158,7 +166,7 @@ function App() {
           events: [],
         }))
       );
-      setSidebarOpen(false);
+      // setSidebarOpen(false);
       listTranscripts().then(setTranscripts);
     } catch (e: any) {
       alert(e.message);
@@ -171,6 +179,21 @@ function App() {
       setTranscripts((prev) => prev.filter((t) => t.session_id !== transcriptId));
     } catch (e: any) {
       alert(e.message);
+    }
+  };
+
+  const handleInterrupt = async () => {
+    if (!currentRunId) return;
+    try {
+      await interruptRun(currentRunId);
+    } catch {
+      // run may not exist anymore (server restart or already completed), treat as already stopped
+      setIsRunning(false);
+      setCurrentRunId(null);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
     }
   };
 
@@ -198,11 +221,12 @@ function App() {
   return (
     <div className="app-layout">
       {/* Sidebar */}
-      <div className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+      <div className={`sidebar ${sidebarOpen ? "" : "collapsed"}`}>
         <div className="sidebar-header">
           <span className="sidebar-title">历史对话</span>
           <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
+        <button className="sidebar-new-btn" onClick={handleNewChat}>+ 新对话</button>
         <div className="sidebar-list">
           {transcripts.length === 0 && (
             <div className="sidebar-empty">暂无历史记录</div>
@@ -230,19 +254,14 @@ function App() {
         </div>
       </div>
 
-      {/* Overlay when sidebar is open */}
-      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
-
       {/* Main chat area */}
       <div className="app">
         <div className="header">
-          <button className="btn btn-icon" onClick={() => setSidebarOpen(!sidebarOpen)} title="历史对话">
+          <button className="btn btn-icon" onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? "收起侧栏" : "展开侧栏"}>
             ☰
           </button>
           <div className="header-title">AI 编程助手</div>
-          <div className="header-actions">
-            {/* <button className="btn" onClick={handleClear}>清空对话</button> */}
-          </div>
+          <div className="header-actions" />
         </div>
 
         <div className="messages">
@@ -309,13 +328,19 @@ function App() {
             disabled={isRunning}
             rows={1}
           />
-          <button
-            className="btn btn-primary"
-            onClick={handleSend}
-            disabled={isRunning || !input.trim()}
-          >
-            发送
-          </button>
+          {isRunning ? (
+            <button className="btn btn-stop" onClick={handleInterrupt}>
+              停止
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={handleSend}
+              disabled={!input.trim()}
+            >
+              发送
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -328,6 +353,7 @@ function EventStream({ events }: { events: AgentEvent[] }) {
     | { kind: "reasoning"; content: string }
     | { kind: "tool"; call: AgentEvent; result?: AgentEvent }
     | { kind: "permission_denied"; data: AgentEvent }
+    | { kind: "interrupted" }
     | { kind: "error"; data: AgentEvent }
     | { kind: "response"; content: string }
   > = [];
@@ -353,6 +379,8 @@ function EventStream({ events }: { events: AgentEvent[] }) {
       } else {
         items.push({ kind: "tool", call: ev, result: undefined });
       }
+    } else if (ev.type === "interrupted") {
+      items.push({ kind: "interrupted" });
     } else if (ev.type === "permission_denied") {
       items.push({ kind: "permission_denied", data: ev });
     } else if (ev.type === "error") {
@@ -385,6 +413,14 @@ function EventStream({ events }: { events: AgentEvent[] }) {
 
         if (item.kind === "tool") {
           return <ToolCallCard key={i} call={item.call} result={item.result} />;
+        }
+
+        if (item.kind === "interrupted") {
+          return (
+            <div key={i} className="event-interrupted">
+              对话已中断
+            </div>
+          );
         }
 
         if (item.kind === "permission_denied") {

@@ -61,3 +61,17 @@ export async function deleteTranscript(transcriptId: string): Promise<void> {
     throw new Error(err.detail || "删除失败");
   }
 }
+
+export async function newSession(): Promise<string> {
+  const res = await fetch(`${BASE}/sessions`, { method: "POST" });
+  const data = await res.json();
+  return data.session_id;
+}
+
+export async function interruptRun(runId: string): Promise<void> {
+  const res = await fetch(`${BASE}/runs/${runId}/interrupt`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "中断失败");
+  }
+}

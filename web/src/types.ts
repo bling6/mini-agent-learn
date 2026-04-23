@@ -1,5 +1,5 @@
 export interface AgentEvent {
-  type: "thinking" | "reasoning" | "tool_call" | "tool_result" | "response" | "error" | "permission_denied";
+  type: "thinking" | "reasoning" | "tool_call" | "tool_result" | "response" | "error" | "permission_denied" | "interrupted";
   data: Record<string, any>;
 }
 

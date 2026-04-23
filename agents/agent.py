@@ -3,6 +3,7 @@ from agents.todo import todoList
 from openai import OpenAI
 import os
 import json
+import threading
 from dotenv import load_dotenv
 from agents.tools import PARENT_TOOLS, TOOL_MAPPER
 from agents.utils.context_compression import tools_msg_compression, auto_compression
@@ -35,6 +36,7 @@ class Agent:
         system_prompt: str = "",
         teammateName: str = "",
         output_handler: OutputHandler = None,
+        stop_event: threading.Event = None,
     ):
         self.rounds_since_todo = 0
         self.messages = messages
@@ -45,6 +47,7 @@ class Agent:
         self.teammateName = teammateName
         self.agent_name = teammateName if teammateName else "lead"
         self.output = output_handler or CliOutputHandler()
+        self.stop_event = stop_event
 
     def run(self):
         return self.agent_loop()
@@ -92,6 +95,9 @@ class Agent:
         self.rounds_since_todo = 0
         try:
             while True:
+                if self.stop_event and self.stop_event.is_set():
+                    self.output.response("(对话已中断)")
+                    return "(对话已中断)"
                 system_prompt = build_system_prompt(prefix=self.system_prompt)
                 self.messages[0]["content"] = system_prompt
                 notify_text = self.check_background()
@@ -180,6 +186,8 @@ class Agent:
     def tool_execute(self, tool_calls: list):
         used_todo = False
         for tool_call in tool_calls:
+            if self.stop_event and self.stop_event.is_set():
+                break
             tool_name = tool_call.function.name
             tool_call_id = tool_call.id
             args = json.loads(tool_call.function.arguments)
